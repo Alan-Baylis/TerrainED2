@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class BehaviourTest : MonoBehaviour
+public class TerrainBehaviour : MonoBehaviour
 {
     // Start is called before the first frame update
     void Start()
