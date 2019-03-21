@@ -12,9 +12,10 @@ public class TerrainEditor : EditorWindow
     private string _seed;
     private Texture2D _previewTex;
 
-    private readonly Rect _previewArea = new Rect(70f, 100f, 220f, 240f);
+    //Layout and styling related stuff
+    private readonly Rect _previewArea = new Rect(5f, 100f, 220f, 260f);
 
-    private Vector2 _mouseOrigin; //Origin of mouseDrag
+    bool _showChunkHelp = false;
     private Vector2 _mouseOffset;
     private Event _event;
 
@@ -35,25 +36,25 @@ public class TerrainEditor : EditorWindow
         }
     }
 
-    [MenuItem("Window/Terrain Editor")]
+    [MenuItem("Window/K-Terrain/Terrain generation preferences")]
     static void Init()
     {
         // Get existing open window or if none, make a new one:
         TerrainEditor window = (TerrainEditor)GetWindow(typeof(TerrainEditor));
         window.Show();
         window.EditorInit();
-        window.wantsMouseMove = true;
-        window.minSize = MinSize;
     }
 
     public void EditorInit()
     {
         _previewTex = new Texture2D(200, 200);
+        wantsMouseMove = true;
+        minSize = MinSize;
     }
 
     void OnGUI()
     {
-        GUILayout.Label("You can edit KTerrain parameters in this window");
+        GUILayout.Label("You can edit K-Terrain parameters in this window", EditorStyles.boldLabel);
         GUILayout.Space(20);
         myFloat = EditorGUILayout.Slider("Terrain height:", myFloat, -3f, 6f);
         _seed = EditorGUILayout.TextField("Seed (optional): ", _seed);
@@ -65,56 +66,52 @@ public class TerrainEditor : EditorWindow
 
         GUILayout.Space(20);
 
+        //Preview
         GUILayout.BeginArea(_previewArea);
 
         GUILayout.Label("Preview:");
         GUILayout.Box(_previewTex);
+        if (_showChunkHelp)
+            GUILayout.Label("Use arrow keys to preview other chunks", EditorStyles.miniBoldLabel);
         
-    
         GUILayout.EndArea();
+        //Preview Ends
 
-        DrawChunkLoadButtons();
-
-        CheckDragEvent();
+        UpdateMouseEvent();
     }
 
-    private void DrawChunkLoadButtons()
+    private void DrawChunkLoadButtons() //Unused
     {
+       
         int bWidth = 40;
 
         GUILayout.BeginHorizontal();
-        GUILayout.Button("Up",GUILayout.Width(bWidth));
+        GUILayout.Button("Up", EditorStyles.miniButton, GUILayout.Width(bWidth));
         GUILayout.EndHorizontal();
 
         GUILayout.BeginHorizontal();
-        GUILayout.Button("Left",  GUILayout.Width(bWidth));
-        GUILayout.Button("Down",  GUILayout.Width(bWidth));
-        GUILayout.Button("Right", GUILayout.Width(bWidth));
+        GUILayout.Button("Left", EditorStyles.miniButtonLeft, GUILayout.Width(bWidth));
+        GUILayout.Button("Down", EditorStyles.miniButtonMid, GUILayout.Width(bWidth));
+        GUILayout.Button("Right",EditorStyles.miniButtonRight, GUILayout.Width(bWidth));
         GUILayout.EndHorizontal();
     }
 
-    private void CheckDragEvent() //Maybe just make buttons that load the next chunk, le    ft right up down
+    private void UpdateMouseEvent()
     {
         _event = Event.current;
 
         if (LeftMouseClicked)
         {
-            Debug.Log("Click");
-            _mouseOrigin = _event.mousePosition;
-        }
-
-        if (_event.type == EventType.MouseDrag)
-        {
+            _showChunkHelp = false;
             bool mouseIsInside = _previewArea.Overlaps(new Rect(_event.mousePosition, Vector2.one));
             if (mouseIsInside)
             {
-                _mouseOffset = _mouseOrigin - _event.mousePosition;
-                UpdateTerrainPreview(); //TODO: Make an approximation for the preview, rathen than updating the texture at full resolution, OR sample at slower intervalls
+                _showChunkHelp = true;
+                
             }
+
+            Repaint();
         }
-
-
-        
     }
 
     private void UpdateTerrainPreview()

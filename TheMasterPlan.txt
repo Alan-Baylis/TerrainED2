@@ -1,5 +1,5 @@
 Make Editor
--Preview the generated terrain as 2d colourful noise
+Preview the generated terrain as 2d colourful noise
 
 Use: Triangle.net
      Libnoise or something similar
