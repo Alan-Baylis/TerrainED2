@@ -8,7 +8,10 @@ using System.Windows.Input;
 
 public class TerrainLayerEditor : EditorWindow
 {
-    public string PrefPath;
+    public string PrefPath
+    {
+        get { return Application.dataPath + "/TerrainPrefs/"; }
+    }
 
     private List<TerrainLayer> _editLayers;
     private TerrainLayer _currentEditable;
@@ -17,8 +20,10 @@ public class TerrainLayerEditor : EditorWindow
     private Event _event;
     private int _mouseOriginY;
 
-    TerrainLayer minLayer;
-    TerrainLayer maxLayer;
+    private TerrainLayer bottomLayerDragged;
+    private TerrainLayer topLayerDraggedt;
+    private int topDrag;    //The position in the array of the layer of which .top    value we are modifying
+    private int bottomDrag; //The position in the array of the layer of which .bottom value we are modifying
 
     private Rect _sideRect = new Rect(2, 120, 38, _sideViewHeight + 6);
     private Texture2D _sideCutView;
@@ -30,13 +35,12 @@ public class TerrainLayerEditor : EditorWindow
         // Get existing open window or if none, make a new one:
         TerrainLayerEditor window = (TerrainLayerEditor)GetWindow(typeof(TerrainLayerEditor));
         window.Show();
-        
-        window.PrefPath = Application.dataPath + "/TerrainPrefs/";
+
         //window.GenerateGenericJSON();
         window.wantsMouseMove = true;
     }
 
-    void OnGUI()
+    void OnGUI() //TODO: Make new functions instead of regions
     {
         GeneralMouseEvent();
 
@@ -78,7 +82,7 @@ public class TerrainLayerEditor : EditorWindow
         
         GUILayout.BeginVertical(GUILayout.Width(30f));
 
-        for (int i = 0; i < _editLayers.Count; i++)
+        for (int i = _editLayers.Count - 1; i >= 0; i--)
         {
             TerrainLayer layer = _editLayers[i];
             if (GUILayout.Button(layer.Name, EditorStyles.miniButton))
@@ -110,55 +114,18 @@ public class TerrainLayerEditor : EditorWindow
 
         GUILayout.Label(_currentEditable.Name, EditorStyles.boldLabel);
 
-        #region Calculating min and max values
-        float curMin;
-        float curMax;
-        if (_curEditInt == 0)                          //First one
-        {
-            curMin = 0f;
-            curMax = _editLayers[_curEditInt + 1].Bottom;
-        }
-        else if (_curEditInt == _editLayers.Count - 1) //Last one 
-        {
-            curMin = _editLayers[_curEditInt - 1].Top;
-            curMax = 1.0f;
-        }
-        else                                           //In the middle
-        {
-            curMin = _editLayers[_curEditInt - 1].Top;
-            curMax = _editLayers[_curEditInt + 1].Bottom;
-        }
-        #endregion
-
-        #region Min slider
+        #region Color preview field
         GUILayout.BeginHorizontal();
 
-        GUILayout.Label("Min: ", EditorStyles.largeLabel, GUILayout.Width(30f));
-        
-        _currentEditable.Bottom = (float)Math.Round(
-                                                GUILayout.HorizontalSlider(_currentEditable.Bottom, curMin, curMax - 0.1f)
-                                                , 2);
-
-        GUILayout.Label(_currentEditable.Bottom.ToString(), EditorStyles.miniLabel, GUILayout.Width(30f));
+        GUILayout.Label("PreviewColor: ");
+        _currentEditable.PreviewColor = EditorGUILayout.ColorField(_currentEditable.PreviewColor);
+        _currentEditable.IgnoreHeight = GUILayout.Toggle(_currentEditable.IgnoreHeight,"Ignore Height:");
 
         GUILayout.EndHorizontal();
-        #endregion
-
-        #region Max slider
-        GUILayout.BeginHorizontal();
-
-        GUILayout.Label("Max: ", EditorStyles.largeLabel, GUILayout.Width(30f));
-        _currentEditable.Top = (float)Math.Round(
-                                                GUILayout.HorizontalSlider(_currentEditable.Top, curMin + 0.1f, curMax)
-                                                , 2);
-        GUILayout.Label(_currentEditable.Top.ToString(), EditorStyles.miniLabel, GUILayout.Width(30f));
-
-        GUILayout.EndHorizontal();
-        #endregion
-
+        #endregion Color preview field
         GUILayout.EndVertical();
 
-        #endregion
+        #endregion Current editable
 
         GUILayout.EndHorizontal();
 
@@ -193,14 +160,14 @@ public class TerrainLayerEditor : EditorWindow
 
         int y = (int)(_sideRect.height - _event.mousePosition.y); //This is relative to the _sideRect, since we update the event "inside" the guiutility area
 
-        float yInRange = (float)Math.Round(y / _sideRect.height, 3); //Mouse position scaled to 0.0f - 1.0f range
-
-        //Debug.Log(Math.Round(y / _sideRect.height,3));
+        float yInRange = (float)Math.Round(y / _sideRect.height, 3); //Mouse position.y scaled to 0.0f - 1.0f range
 
         if (_event.type == EventType.MouseDown)
         {
-            int min = y - 6;
-            int max = y + 3;
+
+            #region Drag line hit test
+            int lineHitMin = y - 6;
+            int lineHitMax = y + 3;
 
             for (int i = 1; i < _editLayers.Count; i++)
             {
@@ -208,15 +175,26 @@ public class TerrainLayerEditor : EditorWindow
 
                 int minInPixels = (int)(tlayer.Bottom * _sideViewHeight);
                 Debug.Log("min of " + tlayer.Name + " is " + minInPixels + ". Mouse y = " + y);
-                if (minInPixels > min && minInPixels < max)
+                if (minInPixels > lineHitMin && minInPixels < lineHitMax)
                 {
-                    minLayer = tlayer;
-                    maxLayer = _editLayers[i - 1];
+                    bottomLayerDragged = tlayer.Clone() as TerrainLayer;
+                    topLayerDraggedt = _editLayers[i - 1].Clone() as TerrainLayer;
+
+                    bottomDrag = i;
+                    topDrag = i - 1;
+                    return;
                 }
             }
+            #endregion
+
+            #region Select layer click test
+
+
+
+            #endregion
         }
 
-        if (_event.type == EventType.MouseDrag && minLayer != null)
+        if (_event.type == EventType.MouseDrag && bottomLayerDragged != null)
         {
             _sideCutView = SideCutTexture(GetLayerInfo());
             DrawDragLine(y);
@@ -225,18 +203,29 @@ public class TerrainLayerEditor : EditorWindow
 
         if (_event.type == EventType.MouseUp)
         {
-            if (minLayer != null) // Use a boolean "selected" instead
+            if (bottomLayerDragged != null)
             {
-                float layerMinHeight = 0.1f;
-                float maxValue = Math.Min(minLayer.Top - layerMinHeight, yInRange); //That sure is a whole lotta min and max
-                float minValue = Math.Max(maxLayer.Bottom + layerMinHeight, yInRange); //Oh and these are for ensuring the min and max values don't pass other layers
+                float layerMinHeight = 0.05f;
+                //minLayer.Top - layerMinHeight, yInRange);
 
-                Debug.Log(minLayer.Top - layerMinHeight);
+                if (yInRange < topLayerDraggedt.Bottom + layerMinHeight || yInRange > bottomLayerDragged.Top - layerMinHeight)
+                {
+                    bottomLayerDragged = null;
+                    topLayerDraggedt = null;
+                    return;
+                }
 
-                minLayer.Bottom = minValue;
-                maxLayer.Top = maxValue;
-                minLayer = null; //You can't null these you fucking dip
-                maxLayer = null;
+
+                Debug.Log(bottomLayerDragged.Top - layerMinHeight);
+
+                bottomLayerDragged.Bottom = yInRange;
+                topLayerDraggedt.Top = yInRange;
+
+                _editLayers[bottomDrag] = bottomLayerDragged;
+                _editLayers[topDrag] = topLayerDraggedt;
+                //Debug.Log(realLayerMin.Bottom);
+                bottomLayerDragged = null;
+                topLayerDraggedt = null;
             }
 
             _sideCutView = SideCutTexture(GetLayerInfo());
@@ -245,9 +234,22 @@ public class TerrainLayerEditor : EditorWindow
 
     }
 
+    private TerrainLayer FindTerrain(string name)
+    {
+        TerrainLayer match = null;
+
+        for (int i = 0; i < _editLayers.Count; i++)
+        {
+            if (_editLayers[i].Name == name)
+                match = _editLayers[i];
+        }
+        Debug.Log(match.Name);
+        return match;
+    }
+
     void DrawDragLine (float height)
     {
-        if (minLayer == null)
+        if (bottomLayerDragged == null)
             return;
 
         int lineWidth = 30;
@@ -310,7 +312,25 @@ public class TerrainLayerEditor : EditorWindow
 
     private void SaveDefault()
     {
-        throw new NotImplementedException();
+        List<string> jsonList = new List<string>();
+
+        foreach(TerrainLayer layer in _editLayers)
+        {
+            jsonList.Add(JsonUtility.ToJson(layer));
+        }
+
+        try
+        {
+            File.WriteAllLines(LayerSerializer.DefaultJSONPath, jsonList);
+        }
+        catch (Exception e)
+        {
+            
+        }
+
+        TerrainEditor window = (TerrainEditor)GetWindow(typeof(TerrainEditor));
+        window.Show();
+        window.UpdateTerrainPreview();
     }
 
     private void LoadDefault() //Change current editable layerpref to DefaultTerrainLayers

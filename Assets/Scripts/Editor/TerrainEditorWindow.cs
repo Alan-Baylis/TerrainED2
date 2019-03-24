@@ -9,11 +9,18 @@ public class TerrainEditor : EditorWindow
     public static Vector2 MinSize = new Vector2(420, 320);
 
     private GameObject _terrainObject;
+
+    //TerrainParams
     private string _seed;
+    private float _noiseFreq = 1f; //TODO: make a class that stores perlinnoise values, and make it serializable so you can reuse terrain gen parameters
+    private double _noiseLac = 1.0;
+    private int _noiseOct = 2;
+
     private Texture2D _previewTex;
+    private EditorTerrainDrawing _terDrawing;
 
     //Layout and styling related stuff
-    private readonly Rect _previewArea = new Rect(5f, 100f, 220f, 260f);
+    private readonly Rect _previewArea = new Rect(5f, 150f, 400f, 400f);
 
     bool _showChunkHelp = false;
     private Vector2 _mouseOffset;
@@ -47,18 +54,27 @@ public class TerrainEditor : EditorWindow
 
     public void EditorInit()
     {
-        _previewTex = new Texture2D(200, 200);
+        _previewTex = new Texture2D(320, 320);
+        _terDrawing = new EditorTerrainDrawing(_previewTex);
         wantsMouseMove = true;
         minSize = MinSize;
     }
 
     void OnGUI()
     {
-        GUILayout.Label("You can edit K-Terrain parameters in this window", EditorStyles.boldLabel);
+        GUILayout.Label("You can edit K-Terrain parameters in this window", EditorStyles.boldLabel); //I thought it was funny to "brand" this as K-Terrain. It's just noise, I know
         GUILayout.Space(20);
-        myFloat = EditorGUILayout.Slider("Terrain height:", myFloat, -3f, 6f);
+
         _seed = EditorGUILayout.TextField("Seed (optional): ", _seed);
-        
+        _noiseFreq = EditorGUILayout.FloatField("Frequency: ", _noiseFreq);
+        _noiseLac = EditorGUILayout.Slider("Complexity: ",(float)_noiseLac, 1.0f, 3.4f);
+        _noiseOct = EditorGUILayout.IntSlider("Octaves: ", _noiseOct, 1, 10);
+
+        if (GUI.changed)
+        {
+            UpdateTerrainPreview();
+        }
+
         if (GUILayout.Button("Update Terrain"))
         {
             UpdateTerrainPreview();
@@ -70,30 +86,19 @@ public class TerrainEditor : EditorWindow
         GUILayout.BeginArea(_previewArea);
 
         GUILayout.Label("Preview:");
-        GUILayout.Box(_previewTex);
+
+        if (_terDrawing.FinalTex != null)
+            GUILayout.Box(_terDrawing.FinalTex);
+
         if (_showChunkHelp)
-            GUILayout.Label("Use arrow keys to preview other chunks", EditorStyles.miniBoldLabel);
+            GUILayout.Label("Use arrow keys to preview other chunks", EditorStyles.miniBoldLabel); //False advertising for now, TODO: this
         
         GUILayout.EndArea();
         //Preview Ends
 
+
+
         UpdateMouseEvent();
-    }
-
-    private void DrawChunkLoadButtons() //Unused
-    {
-       
-        int bWidth = 40;
-
-        GUILayout.BeginHorizontal();
-        GUILayout.Button("Up", EditorStyles.miniButton, GUILayout.Width(bWidth));
-        GUILayout.EndHorizontal();
-
-        GUILayout.BeginHorizontal();
-        GUILayout.Button("Left", EditorStyles.miniButtonLeft, GUILayout.Width(bWidth));
-        GUILayout.Button("Down", EditorStyles.miniButtonMid, GUILayout.Width(bWidth));
-        GUILayout.Button("Right",EditorStyles.miniButtonRight, GUILayout.Width(bWidth));
-        GUILayout.EndHorizontal();
     }
 
     private void UpdateMouseEvent()
@@ -114,24 +119,27 @@ public class TerrainEditor : EditorWindow
         }
     }
 
-    private void UpdateTerrainPreview()
+    public void UpdateTerrainPreview()
     {
-        Perlin baseNoise = new Perlin();
+        Perlin baseNoise = new Perlin() { Frequency = _noiseFreq, Lacunarity = _noiseLac, OctaveCount = _noiseOct};
 
         if (_seed != "")
             baseNoise.Seed = Convert.ToInt32(_seed);
         else
-            baseNoise.Seed = UnityEngine.Random.Range(int.MinValue, int.MaxValue); //Dont generate new seed unless we pressed the button
+            baseNoise.Seed = UnityEngine.Random.Range(int.MinValue, int.MaxValue);
             
 
-        LibNoise.Noise2D noise2D = new LibNoise.Noise2D(200, baseNoise);
+        LibNoise.Noise2D noise2D = new LibNoise.Noise2D(_previewTex.width, baseNoise);
 
         float mOff = 0.01f;
 
         noise2D.GeneratePlanar(-1 - _mouseOffset.y * mOff, 1 - _mouseOffset.y * mOff, -1 - _mouseOffset.x * mOff, 1 - _mouseOffset.x * mOff);
 
         _previewTex = noise2D.GetTexture();
-        
+        _terDrawing = new EditorTerrainDrawing(_previewTex);
+        _terDrawing.Update();
+
+
         _previewTex.Apply();
 
     }
