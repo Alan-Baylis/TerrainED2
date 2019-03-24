@@ -26,8 +26,3 @@ public class TerrainLayer : ICloneable
         return new TerrainLayer(this.Name, this.Bottom, this.Top, this.PreviewColor, this.IgnoreHeight); //I acknowledge that this is not good code, and I shouldn't use ICloneable.
     }
 }
-
-public class TerrainGenDefinition
-{
-
-}
